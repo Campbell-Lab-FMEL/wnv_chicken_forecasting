@@ -18,7 +18,7 @@ West Nile Virus (WNV) is the leading cause of mosquito-borne disease in the Unit
   - [scripts/data_processing](./scripts/data_processing): Contains code for processing WNV monitoring data
   - [scripts/environmental_data](./scripts/environmental_data): Contains code for assembling environmental predictor data
   - [scripts/models](./scripts/models): Contains code for executing temporal and spatiotemporal models
-    - [scripts/models/glmmtmb](./scripts/models/glmmtmb): Contains code for temporal modeling using [glmmTMB] https://github.com/glmmTMB/glmmTMB)
+    - [scripts/models/glmmtmb](./scripts/models/glmmtmb): Contains code for temporal modeling using [glmmTMB](https://github.com/glmmTMB/glmmTMB)
     - [scripts/models/glmmtmb](./scripts/models/glmmtmb): Contains code for spatiotemporaltemporal modeling using [sdmTMB](https://pbs-assess.github.io/sdmTMB/)
 ### [functions](./functions): Contains helper functions for executing code contained in [scripts](./scripts)
 
