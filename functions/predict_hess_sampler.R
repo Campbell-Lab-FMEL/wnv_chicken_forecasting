@@ -43,7 +43,7 @@ predict_hess_sampler <- function(
     
   }
   
-  else(cat("you fucked up somewhere..."))
+  else(cat("you messed up somewhere..."))
   
   cat("compiling prediction and Hessian sample data")
   
