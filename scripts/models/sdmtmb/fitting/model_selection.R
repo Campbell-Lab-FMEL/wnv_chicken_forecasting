@@ -149,48 +149,22 @@ sdmTMB_mesh_monthly <- make_mesh(locs_monthly, c("X", "Y"),
 
 
 ###############################################################################################################################################
-############################################################## Running sdmTMB models ##########################################################
+################################################################## Running models #############################################################
 ###############################################################################################################################################
 
 seasonal_offset <- log(data_seasonal_train$testing + 1)
 monthly_offset <- log(data_monthly_train$testing + 1)
 
-sdmtmb_seasonal <- sdmTMB(
-  wnv ~ 1 + poly(prcp, 2) + poly(prcp_lag1, 2) + poly(tmax_lag2, 2) + poly(tmin_lag1, 2) + (1 | county) + (1 | ID),
-  offset = seasonal_offset,
-  time = "time_step",
-  extra_time = 16:19,
-  mesh = sdmTMB_mesh_seasonal,
-  spatial = "off",
-  spatiotemporal = "ar1",
-  family = nbinom1(),
-  data = data_seasonal_train %>% st_drop_geometry())
-write_rds(sdmtmb_seasonal,  "data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
+## Load full models (fixed and random effects with random fields)
 sdmtmb_seasonal <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
 
-sdmtmb_seasonal_fixed_params <- tidy(sdmtmb_seasonal, effects = "fixed")
-sanity(sdmtmb_seasonal)
-
-sdmtmb_monthly <- sdmTMB(
-  wnv ~ 1 + poly(developed, 2) + poly(prcp, 2) + poly(prcp_lag1, 2) + poly(prcp_lag2, 2) +
-        poly(tmax, 2) + poly(tmin_lag2, 2) + poly(wetlands, 2) +
-        (1 | county) + (1 | ID),
-  offset = monthly_offset,
-  time = "time_step",
-  extra_time = 120:133,
-  mesh = sdmTMB_mesh_monthly,
-  spatial = "off",
-  spatiotemporal = "ar1",
-  family = nbinom1(),
-  data = data_monthly_train %>% st_drop_geometry())
-write_rds(sdmtmb_monthly,  "data/chickens/model_predictions/sdmTMB/sdmtmb_monthly_update.rds")
 sdmtmb_monthly <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_monthly_update.rds")
 
-sdmtmb_monthly_fixed_params <- tidy(sdmtmb_monthly, effects = "fixed")
-sanity(sdmtmb_monthly)
+## Fit additional models random field models for model selection
 
-###############################################################################################################################################
+### Seasonal models:
 
+#### Random effects + random fields
 sdmtmb_seasonal_ranef <- sdmTMB(
   wnv ~ (1 | county) + (1 | ID),
   offset = seasonal_offset, 
@@ -202,6 +176,7 @@ sdmtmb_seasonal_ranef <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_seasonal_train %>% st_drop_geometry())
 
+#### fixed effects + random fields 
 sdmtmb_seasonal_fixed <- sdmTMB(
   wnv ~ 1 + poly(prcp, 2) + poly(prcp_lag1, 2) + poly(tmax_lag2, 2) + poly(tmin_lag1, 2),
   offset = seasonal_offset, 
@@ -213,6 +188,7 @@ sdmtmb_seasonal_fixed <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_seasonal_train %>% st_drop_geometry()) 
 
+#### intercept + random fields 
 sdmtmb_seasonal_intercept <- sdmTMB(
   wnv ~ 1,
   offset = seasonal_offset, 
@@ -224,6 +200,9 @@ sdmtmb_seasonal_intercept <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_seasonal_train %>% st_drop_geometry())
 
+### Monthly models:
+
+#### random effects + random fields 
 sdmtmb_monthly_ranef <- sdmTMB(
   wnv ~ (1 | county) + (1 | ID),
   offset = monthly_offset, 
@@ -235,6 +214,7 @@ sdmtmb_monthly_ranef <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_monthly_train %>% st_drop_geometry())
 
+#### fixed effects + random fields
 sdmtmb_monthly_fixed <- sdmTMB(
   wnv ~ 1 + poly(developed, 2) + poly(prcp, 2) + poly(prcp_lag1, 2) + poly(prcp_lag2, 2) + 
     poly(tmax, 2) + poly(tmin_lag2, 2) + poly(wetlands, 2),  
@@ -247,6 +227,7 @@ sdmtmb_monthly_fixed <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_monthly_train %>% st_drop_geometry())
 
+#### intercept + random fields 
 sdmtmb_monthly_intercept <- sdmTMB(
   wnv ~ 1,
   offset = monthly_offset, 
@@ -258,6 +239,12 @@ sdmtmb_monthly_intercept <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_monthly_train %>% st_drop_geometry())
 
+
+## Fit non-spatial models for model selection 
+
+### Seasonal models:
+
+#### fixed and random effects
 glmmtmb_seasonal <- sdmTMB(
   wnv ~ 1 + poly(prcp, 2) + poly(prcp_lag1, 2) + poly(tmax_lag2, 2) + 
     poly(tmin_lag1, 2) + (1 | county) + (1 | ID),
@@ -270,6 +257,7 @@ glmmtmb_seasonal <- sdmTMB(
   family = nbinom1(),
   data = data_seasonal_train %>% st_drop_geometry())
 
+#### random effects 
 glmmtmb_seasonal_ranef <- sdmTMB(
   wnv ~ (1 | county) + (1 | ID),
   offset = seasonal_offset, 
@@ -281,6 +269,7 @@ glmmtmb_seasonal_ranef <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_seasonal_train %>% st_drop_geometry())
 
+#### intercept 
 glmmtmb_seasonal_intercept <- sdmTMB(
   wnv ~ 1,
   offset = seasonal_offset, 
@@ -292,6 +281,10 @@ glmmtmb_seasonal_intercept <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_seasonal_train %>% st_drop_geometry())
 
+
+### Monthly models 
+
+#### fixed and random effects 
 glmmtmb_monthly <- sdmTMB(
   wnv ~ 1 + poly(developed, 2) + poly(prcp, 2) + poly(prcp_lag1, 2) + poly(prcp_lag2, 2) +
     poly(tmax, 2) + poly(tmin_lag2, 2) + poly(wetlands, 2) +
@@ -305,6 +298,7 @@ glmmtmb_monthly <- sdmTMB(
   family = nbinom1(),
   data = data_monthly_train %>% st_drop_geometry())
 
+#### random effects 
 glmmtmb_monthly_ranef <- sdmTMB(
   wnv ~ (1 | county) + (1 | ID),
   offset = monthly_offset, 
@@ -316,6 +310,7 @@ glmmtmb_monthly_ranef <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_monthly_train %>% st_drop_geometry())
 
+#### intercept 
 glmmtmb_monthly_intercept <- sdmTMB(
   wnv ~ 1,
   offset = monthly_offset, 
@@ -327,8 +322,16 @@ glmmtmb_monthly_intercept <- sdmTMB(
   family = sdmTMB::nbinom1(),
   data = data_monthly_train %>% st_drop_geometry())
 
-#################################
+###############################################################################################################################################
 
+
+
+
+###############################################################################################################################################
+#################################################### Calculate metrics for model selection ####################################################
+###############################################################################################################################################
+
+## Create model lists
 seasonal_mods <- list(
   sdmtmb_seasonal,
   sdmtmb_seasonal_ranef,
@@ -351,8 +354,7 @@ monthly_mods <- list(
 write_rds(monthly_mods, "data/chickens/model_predictions/sdmTMB/selection/monthly_mods.rds")
 monthly_mods <- read_rds("data/chickens/model_predictions/sdmTMB/selection/monthly_mods.rds")
 
-######
-
+## Conditional percent deviance explained 
 seasonal_mods_devexp <- data.frame(
   model = c(
     "GMRF, fixed effects, random effects",
@@ -381,6 +383,9 @@ monthly_mods_devexp <- data.frame(
   }) %>%
     unlist()); monthly_mods_devexp
 
+## Effective degrees of freedom 
+
+### Vectorized computaion (likely to crash on small computers)
 # seasonal_mods_edf <- lapply(
 #   seasonal_mods[1:6], FUN = function(x){
 #     cAIC(x, what = "EDF")
@@ -391,6 +396,7 @@ monthly_mods_devexp <- data.frame(
 #     cAIC(x, what = "EDF")
 #   }); monthly_mods_edf
 
+#### list-wise computation
 seasonal_mods_edf <- list()
 seasonal_mods_edf[["GMRF, fixed effects, random effects"]]        <- cAIC(seasonal_mods[[1]], what = "EDF")
 seasonal_mods_edf[["GMRF, random effects"]]                       <- cAIC(seasonal_mods[[2]], what = "EDF")
@@ -407,8 +413,7 @@ monthly_mods_edf[["GMRF, intercepts"]]                           <- cAIC(monthly
 monthly_mods_edf[["Non-spatial, fixed effects, random effects"]] <- cAIC(monthly_mods[[5]], what = "EDF")
 monthly_mods_edf[["Non-spatial, random effects"]]                <- cAIC(monthly_mods[[6]], what = "EDF")
 
-#####
-
+## Conditional AIC
 aic_seasonal <- data.frame(
   model = c(
     "GMRF, fixed effects, random effects",
@@ -439,13 +444,16 @@ aic_monthly <- data.frame(
   mutate(delta_aic = aic - min(aic), 
          aic_weights = round(qpcR::akaike.weights(aic)$weights, 3))
 
+###############################################################################################################################################
 
-##################
+
+
 
 ###############################################################################################################################################
 ################################################################ cross validation #############################################################
 ###############################################################################################################################################
 
+## Create new mesh objects for cross validation (including training and test data subsets)
 locs_seasonal_cv <- data_seasonal_active %>%
   st_coordinates() %>%
   as.data.frame()
@@ -480,7 +488,9 @@ sdmTMB_mesh_monthly_cv <- make_mesh(locs_monthly_cv, c("X", "Y"),
                                  n_knots = n_knots,
                                  mesh = mesh_domain_monthly_cv); plot(sdmTMB_mesh_monthly_cv, col = "green")
 
-###############################################################################################################################################
+## Fit cross validation models
+
+### Monthly CV model
 
 library(future)
 plan(multisession, workers = 2)
@@ -514,8 +524,7 @@ sdmtmb_seasonal_cv$fold_loglik[[2]] # -10465.43 # this should be the within-samp
 sdmtmb_seasonal_cv$sum_loglik       # -12869 # this is the overall LL (training and test sets)
 sdmtmb_seasonal %>% logLik()        # -5580.219 # this is the regular model log likelihood
 
-# the out-of-sample LL is nearly 4x more positive than the within-sample LL, and roughly twice as low as the original training model
-####
+### Seasonal CV model
 
 sdmtmb_monthly_cv <- sdmTMB_cv(
     wnv ~ 1 + poly(developed, 2) + poly(prcp, 2) + poly(prcp_lag1, 2) + poly(prcp_lag2, 2) +
@@ -540,3 +549,5 @@ sdmtmb_monthly_cv$sum_loglik       # -11672.51 # this is the overall LL (trainin
 sdmtmb_monthly %>% logLik()        # -11715.89 # this is the regular model log likelihood
 
 # the out-of-sample LL is over 4x more positive than the within-sample LL, and nearly 3x lower than the original training model
+
+###############################################################################################################################################
