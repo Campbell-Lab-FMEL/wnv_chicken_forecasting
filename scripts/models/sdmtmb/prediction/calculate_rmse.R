@@ -7,8 +7,10 @@ pacman::p_load(
   # ,
 )
 
-### Monthly data
-
+###############################################################################################################################################
+################################################################# Load WNV data ###############################################################
+###############################################################################################################################################
+## Monthly-level data
 data_monthly <- read_rds("data/chickens/monthly/wnv_eeev_env_covs.rds") %>%
   mutate_at(vars(starts_with(c("prcp", "tmax", "tmin")), "developed", "natural", "wetlands", "testing"), 
             .funs = function(x){as.numeric(scale(x))}) %>%
@@ -18,7 +20,7 @@ data_monthly <- read_rds("data/chickens/monthly/wnv_eeev_env_covs.rds") %>%
   mutate(geometry = geometry / 1000) %>%
   bind_cols(as.data.frame(st_coordinates(.)))
 
-# setting training and prediction data
+### setting training and prediction data
 data_monthly_active <- data_monthly %>%
   filter(season == "active") %>%
   left_join(
@@ -34,7 +36,7 @@ data_monthly_active <- data_monthly %>%
 data_monthly_active_train <- data_monthly_active %>%
   filter(!year %in% 2018:2019) 
 
-### Seasonal data
+## Seasonal-level data
 
 data_seasonal <- read_rds("data/chickens/seasonal/wnv_eeev_env_covs.rds") %>%
   mutate(county_ID = paste(county, ID, sep = "_") %>% as.factor()) %>%
@@ -53,7 +55,7 @@ data_seasonal <- read_rds("data/chickens/seasonal/wnv_eeev_env_covs.rds") %>%
   bind_cols(as.data.frame(st_coordinates(.))) %>%
   mutate(date = make_date(year = as.character(year)))
 
-# setting training and prediction data
+### setting training and prediction data
 data_seasonal_active <- data_seasonal %>%
   filter(season == "active") 
 
@@ -62,9 +64,19 @@ data_seasonal_active_train <- data_seasonal_active %>%
 
 #############################################################################################################################################
 
-sdmtmb_seasonal <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
 
+
+
+
+###############################################################################################################################################
+############################################################## Load sdmTMB models #############################################################
+###############################################################################################################################################
+
+## Monthly model
 sdmtmb_monthly <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_monthly_update.rds")
+
+## Seasonal model
+sdmtmb_seasonal <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
 
 #############################################################################################################################################
 
@@ -73,29 +85,68 @@ sdmtmb_monthly <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_monthl
 
 
 ###############################################################################################################################################
-############################################################## Prediction plotting ############################################################
+################################################################ Calculate RMSE ###############################################################
 ###############################################################################################################################################
 
-# monthly active
+## Calculate predictions on hold-out data
 
-data_monthly_active_agg <- data_monthly_active %>%
-  group_by(month, year) %>%
-  summarize(wnv_mean = mean(wnv),
-            wnv_sum = sum(wnv), 
-            se = sd(wnv)/sqrt(n())) %>%
-  mutate(date = make_date(month = as.character(month), year = as.character(year)))
-
+### Monthly predictions
 sdmtmb_monthly_preds <- sdmtmb_monthly %>%
   predict(newdata = data_monthly_active %>%
             st_drop_geometry() %>%
             filter(year %in% 2018:2019),
-          re_form = NA, re_form_iid = NA, se_fit = T) %>%
+          se_fit = F, # avoid calculating standard errors for computational effeciency 
+          # random effect structures:
+          re_form = NA, # mean population level estimates for site/county intercepts
+          re_form_iid = NA) %>% # include spatial random effects (SPDE random fields)
   mutate(date = make_date(month = as.character(month), year = as.character(year)))
-write_rds(sdmtmb_monthly_preds, "data/chickens/model_predictions/sdmTMB/sdmtmb_monthly_preds.rds")
+write_rds(sdmtmb_monthly_preds, "data/chickens/model_predictions/sdmTMB/sdmtmb_monthly_holdout_preds.rds")
 
+### Seasonal predictions
 sdmtmb_seasonal_preds <- sdmtmb_seasonal %>%
   predict(newdata = data_seasonal_active %>%
             st_drop_geometry() %>%
             filter(year %in% 2016:2019),
-          re_form = NA, re_form_iid = NA, se_fit = T)
-write_rds(sdmtmb_seasonal_preds, "data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_preds.rds")
+                    se_fit = F, # avoid calculating standard errors for computational effeciency 
+          # random effect structures:
+          re_form = NA, # mean population level estimates for site/county intercepts
+          re_form_iid = NA) %>% # include spatial random effects (SPDE random fields)
+write_rds(sdmtmb_seasonal_preds, "data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_holdout_preds.rds")
+
+## Calculate total RMSE (across time periods) using hold-out predictions
+
+### Monthly total RMSE
+rmse_monthly_total <- rmse(sdmtmb_monthly_preds$wnv, exp(sdmtmb_monthly_preds$est))
+
+### Seasonal total RMSE
+rmse_seasonal_total <- rmse(sdmtmb_seasonal_preds$wnv, exp(sdmtmb_seasonal_preds$est))
+
+
+
+## Calculate yearly RMSE 
+
+### Monthly RMSE by year
+rmse_monthly_year <- sdmtmb_monthly_preds %>% 
+  group_by(year) %>%
+  summarize(rmse = rmse(wnv, exp(est)))
+
+### Seasonal RMSE by year
+rmse_seasonal_year <- sdmtmb_seasonal_preds %>% 
+  group_by(year) %>%
+  summarize(rmse = rmse(wnv, exp(est)))
+
+## Calculate monthly RMSE
+rmse_monthly_month <- sdmtmb_monthly_preds %>% 
+  group_by(year, month) %>%
+  summarize(rmse = rmse(wnv, exp(est)))
+
+### Cacluate yearly min and max RMSE from monthly estimates
+rmse_monthly_month %>%
+  group_by(year) %>%
+  summarize(min = min(rmse), 
+            max = max(rmse))
+
+#############################################################################################################################################
+
+
+###############################################################################################################################################
