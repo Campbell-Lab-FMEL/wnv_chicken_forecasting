@@ -10,7 +10,20 @@ pacman::p_load(
   # ,
 )
 
-setwd("/blue/guralnick/jbaecher/chickens")
+#############################################################################################################################################
+############################################################ Loading functions ############################################################## 
+#############################################################################################################################################
+
+source("/functions/truncate.R")
+
+#############################################################################################################################################
+
+
+
+
+#############################################################################################################################################
+###################################################### Processing chicken data ############################################################## 
+#############################################################################################################################################
 
 ### Monthly data
 
@@ -33,10 +46,14 @@ data_monthly_active <- data_monthly %>%
       arrange(year, month) %>%
       mutate(time_step = row_number(),
              year = as.factor(year)) %>%
-      select(month, year, time_step))
+      mutate(date = make_date(month = as.character(month), year = as.character(year))) %>%
+      select(month, year, date, time_step))
 
-data_monthly_active_train <- data_monthly_active %>%
+data_monthly_train <- data_monthly_active %>%
   filter(!year %in% 2018:2019) 
+
+data_monthly_pred <- data_monthly_active %>%
+  filter(year %in% 2018:2019) 
 
 ### Seasonal data
 
@@ -60,21 +77,45 @@ data_seasonal <- read_rds("data/chickens/seasonal/wnv_eeev_env_covs.rds") %>%
 data_seasonal_active <- data_seasonal %>%
   filter(season == "active") 
 
-data_seasonal_active_train <- data_seasonal_active %>%
+data_seasonal_train <- data_seasonal_active %>%
   filter(!year %in% 2016:2019)
 
+data_seasonal_pred <- data_seasonal_active %>%
+  filter(year %in% 2016:2019)
+
 #############################################################################################################################################
 
-sdmtmb_seasonal <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
 
+
+
+
+###############################################################################################################################################
+############################################################## Load sdmTMB models #############################################################
+###############################################################################################################################################
+
+## Monthly model
 sdmtmb_monthly <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_monthly_update.rds")
 
+## Seasonal model
+sdmtmb_seasonal <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
+
 #############################################################################################################################################
 
-n <- 10
+
+
+
+
+
+###############################################################################################################################################
+####################################################### Create new data for response curves ###################################################
+###############################################################################################################################################
+
+## Note: response curves are computationally intensive... 
+
+n <- 10 # number of points along response curve
 
 ## Monthly:
-# prcp_lag2
+### prcp_lag2
 sdmtmb_monthly_newdata_prcp_lag2 <- sdmtmb_monthly %>%
   predict(se_fit = TRUE, re_form = NA, re_form_iid = NA,
           newdata = data.frame(
@@ -90,7 +131,7 @@ sdmtmb_monthly_newdata_prcp_lag2 <- sdmtmb_monthly %>%
             county = NA, ID = NA, time_step = 19)
           )
 
-# tmax
+### tmax
 sdmtmb_monthly_newdata_tmax <- sdmtmb_monthly %>%
   predict(se_fit = TRUE, re_form = NA, re_form_iid = NA,
           newdata = data.frame(
@@ -106,7 +147,7 @@ sdmtmb_monthly_newdata_tmax <- sdmtmb_monthly %>%
             county = NA, ID = NA, time_step = 19)
   )
 
-# tmin_lag2
+### tmin_lag2
 sdmtmb_monthly_newdata_tmin_lag2 <- sdmtmb_monthly %>%
   predict(se_fit = TRUE, re_form = NA, re_form_iid = NA,
           newdata = data.frame(
@@ -123,7 +164,7 @@ sdmtmb_monthly_newdata_tmin_lag2 <- sdmtmb_monthly %>%
   )
 
 ## Seasonal:
-# prcp_lag1
+### prcp_lag1
 sdmtmb_seasonal_newdata_prcp_lag1 <- sdmtmb_seasonal %>%
   predict(se_fit = TRUE, re_form = NA, re_form_iid = NA,
           newdata = data.frame(
@@ -143,6 +184,19 @@ sdmtmb_plot_preds <- list(
   sdmtmb_seasonal_newdata_prcp_lag1)
 
 write_rds(sdmtmb_plot_preds, "data/chickens/model_predictions/sdmTMB/sdmtmb_plot_preds.rds")
+
+#############################################################################################################################################
+
+
+
+
+
+
+###############################################################################################################################################
+############################################################### Plot response curves ##########################################################
+###############################################################################################################################################
+
+## Code for creating manuscript Figure 3. 
 
 sdmtmb_preds_plots <- ggarrange(
   
@@ -196,3 +250,6 @@ sdmtmb_preds_plots_ann <- annotate_figure(
                          gp = grid::gpar(cex = 1, fontface = "bold"))
 ); ggsave("figures/Alex/wnv/sdmtmb/sdmtmb_preds_plots_ann.jpeg", 
        width = 3.5, height = 10, dpi = 600)
+
+#############################################################################################################################################
+
