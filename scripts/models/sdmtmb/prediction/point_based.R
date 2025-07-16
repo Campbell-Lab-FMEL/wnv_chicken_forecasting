@@ -10,22 +10,15 @@ pacman::p_load(
   # ,
 ); conflicted::conflict_prefer_all("dplyr", quiet = T)
 
-###########################################################################################################
 
-truncate <- function(obj, lower, upper){
-  if(missing(upper)){
-    obj[obj > stats::quantile(obj, lower, na.rm = T)] <- stats::quantile(obj, lower, na.rm = T)
-  }
-  if(missing(lower)){
-    obj[obj > stats::quantile(obj, upper, na.rm = T)] <- stats::quantile(obj, upper, na.rm = T)
-  } 
-  else(
-    obj[obj > stats::quantile(obj, c(lower, upper, na.rm = T))] <- stats::quantile(obj, c(lower, upper, na.rm = T))
-  )
-  return(obj)
-}
 
-###########################################################################################################
+#############################################################################################################################################
+############################################################ Loading functions ############################################################## 
+#############################################################################################################################################
+
+source("/functions/truncate.R")
+
+#############################################################################################################################################
 
 
 
@@ -97,161 +90,25 @@ data_seasonal_pred <- data_seasonal_active %>%
 
 
 
-#############################################################################################################################################
-############################################################### load env data ###############################################################
-#############################################################################################################################################
-
-# env_seasonal_df <- read_rds("data/environment/env_covs_seasonal.rds")
-
-# env_monthly_df <- read_rds("data/environment/env_covs_monthly.rds")
-
-#############################################################################################################################################
-
-
-
 
 ###############################################################################################################################################
-############################################################ Creating a spatial mesh ##########################################################
+############################################################## Load sdmTMB models #############################################################
 ###############################################################################################################################################
 
-locs_seasonal <- data_seasonal_active_train %>%
-  st_coordinates() %>%
-  as.data.frame()
-
-locs_monthly <- data_monthly_active_train %>%
-  st_coordinates() %>%
-  as.data.frame()
-
-fl_crop <- read_rds("data/fl_polygon_crop.rds")
-
-fl_coords <- fl_crop %>%
-  st_buffer(2) %>%
-  st_sample(8000) %>%
-  st_coordinates() %>%
-  as.data.frame() %>%
-  bind_rows(locs_monthly)
-
-{domain <- fl_coords %>%
-    coordinates() %>%
-    inla.nonconvex.hull(convex = -.02,
-                        resolution = c(56,51)); 
-  plot(fl_crop %>% st_geometry(), border = "red"); 
-  lines(domain); 
-  plot(data_seasonal["county"], add = T)}
-
-max_edge <- locs_seasonal %>%
-  select(X) %>%
-  range() %>%
-  diff();
-
-offset_fact1 <- 1
-offset_fact2 <- 20
-maxedge_fact <- (3*5)
-cutoff_fact <- 5
-n_knots <- 100
-
-mesh_domain_seasonal <- fmesher::fm_mesh_2d_inla(
-  loc = locs_seasonal,
-  boundary = domain,
-  max.edge = c(5,10)*((max_edge)/maxedge_fact),
-  offset = c(max_edge/offset_fact1, max_edge/offset_fact2),
-  cutoff = cutoff_fact); mesh_domain_seasonal$n; plot(mesh_domain_seasonal)
-
-mesh_domain_monthly <- fmesher::fm_mesh_2d_inla(
-  loc = locs_monthly,
-  boundary = domain,
-  max.edge = c(5,10)*((max_edge)/maxedge_fact),
-  offset = c(max_edge/offset_fact1, max_edge/offset_fact2),
-  cutoff = cutoff_fact); mesh_domain_monthly$n; plot(mesh_domain_monthly)
-
-sdmTMB_mesh_seasonal <- make_mesh(locs_seasonal, c("X", "Y"),
-                                  n_knots = n_knots,
-                                  mesh = mesh_domain_seasonal); plot(sdmTMB_mesh_seasonal, 
-                                                                     col = "green")
-
-sdmTMB_mesh_monthly <- make_mesh(locs_monthly, c("X", "Y"),
-                                 n_knots = n_knots,
-                                 mesh = mesh_domain_monthly); plot(sdmTMB_mesh_monthly, col = "green")
-
-# ggplot() + 
-#   geom_raster(data = env_monthly_df %>%
-#                 filter(year == "2016" & month == 6), aes(x = lon, y = lat, fill = developed)) +
-#   inlabru::gg(sdmTMB_mesh_monthly$mesh) +
-#   geom_sf(data = data_monthly_active, fill = "red", col = "grey80", shape = 21, size = 1, alpha = 0.8) +
-#   theme_void() +
-#   theme(
-#     legend.position = "none",
-#     axis.title = element_blank()
-#   )
-# ggsave("figures/Alex/wnv/sdmtmb/mesh/domain_mesh_update.jpeg", height = 6, width = 6, dpi = 600)
-
-###############################################################################################################################################
-
-
-
-###############################################################################################################################################
-############################################################## Running sdmTMB models ##########################################################
-###############################################################################################################################################
-
-seasonal_offset <- log(data_seasonal_active$testing + 1)
-monthly_offset <- log(data_monthly_active$testing + 1)
-
-# sdmtmb_seasonal <- sdmTMB(
-#   wnv ~ 1 + 
-#         poly(prcp, 2) + 
-#         poly(prcp_lag1, 2) + 
-#         poly(tmax_lag2, 2) + 
-#         poly(tmin_lag1, 2) + 
-#         (1 | county) + (1 | ID),
-#   offset = seasonal_offset, 
-#   time = "time_step",
-#   extra_time = 16:19,
-#   mesh = sdmTMB_mesh_seasonal,
-#   spatial = "off",
-#   spatiotemporal = "ar1",
-#   family = nbinom1(),
-#   data = data_seasonal_train %>% st_drop_geometry())
-# 
-# write_rds(sdmtmb_seasonal,  "data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
-sdmtmb_seasonal <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
-
-# sdmtmb_seasonal_fixed_params <- tidy(sdmtmb_seasonal, effects = "fixed")
-
-# sanity(sdmtmb_seasonal)
-
-# sdmtmb_seasonal_dharma <- simulate(sdmtmb_seasonal, nsim = 100, type = "mle-mvn", newdata = data_seasonal_active_train) %>%
-#   dharma_residuals(sdmtmb_seasonal, return_DHARMa = T)
-# plot(sdmtmb_seasonal_dharma)
-
-# sdmtmb_monthly <- sdmTMB(
-#   wnv ~ 1 + 
-#         poly(developed, 2) + 
-#         poly(prcp, 2) + 
-#         poly(prcp_lag1, 2) + 
-#         poly(prcp_lag2, 2) + 
-#         poly(tmax, 2) + 
-#         poly(tmin_lag2, 2) + 
-#         poly(wetlands, 2) + 
-#         (1 | county) + (1 | ID),
-#   offset = monthly_offset, 
-#   time = "time_step",
-#   extra_time = 120:133,
-#   mesh = sdmTMB_mesh_monthly,
-#   spatial = "off",
-#   spatiotemporal = "ar1",
-#   family = nbinom1(),
-#   data = data_monthly_train %>% st_drop_geometry())
-# 
-# write_rds(sdmtmb_monthly,  "data/chickens/model_predictions/sdmTMB/sdmtmb_monthly_update.rds")
+## Monthly model
 sdmtmb_monthly <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_monthly_update.rds")
 
+## Seasonal model
+sdmtmb_seasonal <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_seasonal_update.rds")
+
+#############################################################################################################################################
+
+
+
+
+
 ###############################################################################################################################################
-
-
-
-
-###############################################################################################################################################
-############################################################## epsilon correction #############################################################
+############################################################## Epsilon correction #############################################################
 ###############################################################################################################################################
 
 ### get epsilon updated estimates
@@ -298,7 +155,7 @@ row.names(monthly_sims) <- data_monthly_active$time_step
 
 
 ###############################################################################################################################################
-################################################## plotting epsilon-corrected data ############################################################
+################################################ Plotting seasonal epsilon-corrected data #####################################################
 ###############################################################################################################################################
 
 data_seasonal_active_agg <- data_seasonal_active %>%
@@ -324,6 +181,8 @@ sdmtmb_seasonal_sims_ind <- bind_rows(
   mutate(year = rep(as.character(2001:2019), 4),
          month = "10",
          date = make_date(year = year, month = month))
+
+### Code for producing Figure 2 -- seasonal panel
 
 seasonal_temp_pred <- ggplot() +
   geom_area(data = data_seasonal_active_agg, aes(x = date, y = wnv, fill = "Empirical"), col = "grey20") +
@@ -363,7 +222,7 @@ seasonal_temp_pred <- ggplot() +
 
 
 ###############################################################################################################################################
-################################################## plotting epsilon-corrected data ############################################################
+################################################# Plotting monthly epsilon-corrected data #####################################################
 ###############################################################################################################################################
 
 data_monthly_active_agg <- data_monthly_active %>%
@@ -394,7 +253,7 @@ sdmtmb_monthly_sims_ind <- bind_rows(
              year = as.factor(year))) %>%
   mutate(date = make_date(month = month, year = as.character(year)))
 
-sdmtmb_monthly_sims_ind$upr %>% max()
+### Code for producing Figure 2 -- monthly panel
 
 monthly_temp_pred <- ggplot() +
   geom_area(data = data_monthly_active_agg, aes(x = date, y = wnv, fill = "Empirical"), col = "grey20") +
@@ -439,196 +298,6 @@ ggpubr::annotate_figure(
                          rot = -90,
                          gp = grid::gpar(cex = 1, fontface = "bold"))); 
 ggsave("figures/Alex/wnv/sdmtmb/temporal_predictions.jpeg", width = 6, height = 8, dpi = 600)
-
-###############################################################################################################################################
-
-###############################################################################################################################################
-
-sdmtmb_plot_preds <- read_rds("data/chickens/model_predictions/sdmTMB/sdmtmb_plot_preds.rds")
-
-names(sdmtmb_plot_preds) <- c(
-  "sdmtmb_seasonal_newdata_prcp",
-  "sdmtmb_seasonal_newdata_prcp_lag1",
-  "sdmtmb_seasonal_newdata_tmax_lag2",
-  "sdmtmb_seasonal_newdata_tmin_lag2",
-
-  "sdmtmb_monthly_newdata_developed",
-  "sdmtmb_monthly_newdata_prcp",
-  "sdmtmb_monthly_newdata_tmax",
-  "sdmtmb_monthly_newdata_tmin_lag2")
-
-############################
-
-sdmtmb_preds_plots <- ggarrange(
-  
-  ############### monthly #################
-  
-  ggplot(sdmtmb_plot_preds$sdmtmb_monthly_newdata_developed, 
-         aes(x = developed, y = exp(est),
-             ymin = exp(est - 1.96 * est_se),
-             ymax = exp(est + 1.96 * est_se))) +
-    geom_ribbon(fill = "darkcyan", alpha = 0.4) +
-    geom_line() +
-    ylim(c(0, 0.01)) +
-    labs(x = parse(text = "Prop(Developed~land)^2"), y = NULL) +
-    theme_linedraw() +
-    theme(
-      , panel.grid.minor = element_blank()
-      , panel.grid.major = element_blank()
-      , panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
-      , axis.ticks = element_line(colour = "black", linewidth = 0.5)
-    ),
-  
-  ggplot(sdmtmb_plot_preds$sdmtmb_monthly_newdata_prcp, 
-         aes(x = prcp, y = exp(est),
-             ymin = exp(est - 1.96 * est_se),
-             ymax = exp(est + 1.96 * est_se))) +
-    geom_ribbon(fill = "darkcyan", alpha = 0.4) +
-    geom_line() +
-    ylim(c(0, 0.05)) +
-    labs(x = parse(text = "Cumulative~Precipitation^2"), y = NULL) +
-    theme_linedraw() +
-    theme(
-      , panel.grid.minor = element_blank()
-      , panel.grid.major = element_blank()
-      , panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
-      , axis.ticks = element_line(colour = "black", linewidth = 0.5)
-    ),
-  
-  ggplot(sdmtmb_plot_preds$sdmtmb_monthly_newdata_tmax, 
-         aes(x = tmax, y = exp(est),
-             ymin = exp(est - 1.96 * est_se),
-             ymax = exp(est + 1.96 * est_se))) +
-    geom_ribbon(fill = "darkcyan", alpha = 0.4) +
-    geom_line() +
-    ylim(c(0, 0.05)) +
-    labs(x = parse(text = "Maximum~Temperature^2"), y = NULL) +
-    theme_linedraw() +
-    theme(
-      , panel.grid.minor = element_blank()
-      , panel.grid.major = element_blank()
-      , panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
-      , axis.ticks = element_line(colour = "black", linewidth = 0.5)
-    ),
-  
-  ggplot(sdmtmb_plot_preds$sdmtmb_seasonal_newdata_tmin_lag2, 
-         aes(x = tmin_lag2, y = exp(est),
-             ymin = exp(est - 1.96 * est_se),
-             ymax = exp(est + 1.96 * est_se))) +
-    geom_ribbon(fill = "darkcyan", alpha = 0.4) +
-    geom_line() +
-    scale_y_log10(guide = "axis_logticks",
-                  limits = c(0.00001, 100),
-                  breaks = c(1, 10, 100),
-                  labels = c("1", "10", "100"),
-                  expand = expansion(add = 0.005)) +
-    labs(x = parse(text = "Minimum~Temperature^2~~(2~mo.~lag)"), y = NULL) +
-    theme_linedraw() +
-    theme(
-      , panel.grid.minor = element_blank()
-      , panel.grid.major = element_blank()
-      , panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
-      , axis.ticks = element_line(colour = "black", linewidth = 0.5)
-    ),
-  
-  ############ seasonal ############
-  
-  ggplot(sdmtmb_plot_preds$sdmtmb_seasonal_newdata_prcp, 
-         aes(x = prcp, y = exp(est),
-             ymin = exp(est - 1.96 * est_se), 
-             ymax = exp(est + 1.96 * est_se))) +
-    geom_ribbon(fill = "darkcyan", alpha = 0.4) +
-    geom_line() + 
-    labs(x = parse(text = "Cumulative~Precipitation^2"), y = NULL) +
-    ylim(c(0, 2)) +
-    theme_linedraw() +
-    theme(
-      , panel.grid.minor = element_blank()
-      , panel.grid.major = element_blank()
-      , panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
-      , axis.ticks = element_line(colour = "black", linewidth = 0.5)
-    ),
-  
-  ggplot(sdmtmb_plot_preds$sdmtmb_seasonal_newdata_prcp_lag1, 
-         aes(x = prcp_lag1, y = exp(est),
-             ymin = exp(est - 1.96 * est_se), 
-             ymax = exp(est + 1.96 * est_se))) +
-    geom_ribbon(fill = "darkcyan", alpha = 0.4) +
-    geom_line() + 
-    ylim(c(0, 1)) +
-    labs(x = parse(text = "Cumulative~Precipitation^2~~(6~mo.~lag)"), y = NULL) +
-    theme_linedraw() +
-    theme(
-      , panel.grid.minor = element_blank()
-      , panel.grid.major = element_blank()
-      , panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
-      , axis.ticks = element_line(colour = "black", linewidth = 0.5)
-    ),
-  
-  ggplot(sdmtmb_plot_preds$sdmtmb_seasonal_newdata_tmax_lag2, 
-         aes(x = tmax_lag2, y = exp(est),
-             ymin = exp(est - 1.96 * est_se), 
-             ymax = exp(est + 1.96 * est_se))) +
-    geom_ribbon(fill = "darkcyan", alpha = 0.4) +
-    geom_line() + 
-    scale_y_log10(guide = "axis_logticks",
-                  limits = c(0.00001, 100),
-                  breaks = c(1, 10, 100),
-                  labels = c("1", "10", "100"),
-                  expand = expansion(add = 0.005)) +
-    labs(x = parse(text = "Maximum~Temperature^2~~(12~mo.~lag)"), y = NULL) +
-    theme_linedraw() +
-    theme(
-      , panel.grid.minor = element_blank()
-      , panel.grid.major = element_blank()
-      , panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
-      , axis.ticks = element_line(colour = "black", linewidth = 0.5)
-    ),
-  
-  ggplot(sdmtmb_plot_preds$sdmtmb_seasonal_newdata_tmin_lag2, 
-         aes(x = tmin_lag2, y = exp(est),
-             ymin = exp(est - 1.96 * est_se),
-             ymax = exp(est + 1.96 * est_se))) +
-    geom_ribbon(fill = "darkcyan", alpha = 0.4) +
-    geom_line() +
-    scale_y_log10(guide = "axis_logticks",
-                  limits = c(0.00001, 100),
-                  breaks = c(1, 10, 100),
-                  labels = c("1", "10", "100"),
-                  expand = expansion(add = 0.005)) +
-    labs(x = parse(text = "Minimum~Temperature^2~~(12~mo.~lag)"), y = NULL) +
-    theme_linedraw() +
-    theme(
-      , panel.grid.minor = element_blank()
-      , panel.grid.major = element_blank()
-      , panel.border = element_rect(colour = "black", fill = NA, linewidth = 1)
-      , axis.ticks = element_line(colour = "black", linewidth = 0.5)
-    )
-  ,
-  
-  nrow = 4, 
-  ncol = 2,
-  align = "hv")  +         #  T,    R,    B,     L
-  theme(plot.margin = margin(0.50, 0.5, 0.00, 0.00, "cm")); sdmtmb_preds_plots
-
-sdmtmb_preds_plots_ann <- annotate_figure(
-  sdmtmb_preds_plots, 
-  top = grid::textGrob("Spatiotemporal model",
-                       hjust = 0.5,
-                       vjust = 1,
-                       gp = grid::gpar(cex = 1.5, fontface = "bold")),
-  left = grid::textGrob("Predicted WNV conversion prevalence",
-                        rot = 90,
-                        hjust = 0.5,
-                        vjust = 1,
-                        gp = grid::gpar(cex = 1.1)),
-  right = grid::textGrob("Monthly                                       Monthly                                     Seasonal                                    Seasonal",
-                         hjust = 0.5,
-                         vjust = 1.2,
-                         rot = -90,
-                         gp = grid::gpar(cex = 1.2, fontface = "bold"))
-); ggsave("figures/Alex/wnv/sdmtmb/sdmtmb_preds_plots_ann.jpeg", 
-          width = 7, height = 12, dpi = 600)
 
 ###############################################################################################################################################
 
