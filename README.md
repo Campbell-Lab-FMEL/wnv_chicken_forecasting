@@ -21,7 +21,7 @@ West Nile Virus (WNV) is the leading cause of mosquito-borne disease in the Unit
   - [`stepwise_vif.R`](./functions/stepwise_vif.R): Iteratively performs VIF calculations while removing multicollinear variables
   - [`truncate.R`](./functions/truncate.R): Truncates raster values based on supplied threshold values to improve visualization
 
-### [`./scripts`](./scripts): Contains code for conducting an modeling spatiotemporal WNV transmission dynamics
+### [`./scripts`](./scripts): Contains code for modeling spatiotemporal transmission dynamics of West Nile virus
   - [`/data_processing`](./scripts/data_processing): Contains scripts for processing WNV monitoring data
   - [`/environmental_data`](./scripts/environmental_data): Contains scripts for assembling environmental predictor data
   - [`/models`](./scripts/models): Contains scripts for executing temporal and spatiotemporal models
