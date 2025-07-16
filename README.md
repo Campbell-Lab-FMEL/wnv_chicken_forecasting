@@ -1,12 +1,14 @@
 # [Toward Ecological Forecasting of West Nile Virus in Florida: Insights from Two Decades of Sentinel Chicken Surveillance](https://doi.org/10.32942/X2QH09)
-
-### [J. Alex Baecher](https://www.alexbaecher.com/), V. A. Akshay, [Robert P. Guralnick](https://www.gurlab.net/), Amy M. Bauer, Yasmin N. Tavares, Yesenia Sánchez, [James T. Thorson](https://sites.google.com/site/thorsonresearch/), [Lindsay P. Campbell](https://lcampbelllab.wixsite.com/campbell-lab/)
-
 ### *In Review at* Science of the Total Environment 
+
+### Authors: [J. Alex Baecher](https://www.alexbaecher.com/), V. A. Akshay, [Robert P. Guralnick](https://www.gurlab.net/), Amy M. Bauer, Yasmin N. Tavares, Yesenia Sánchez, [James T. Thorson](https://sites.google.com/site/thorsonresearch/), [Lindsay P. Campbell](https://lcampbelllab.wixsite.com/campbell-lab/)
 
 ### Preprint: [**EcoEvoRxiv**](https://doi.org/10.32942/X2QH09)
 
-### Please contact the first author for questions about the code or data: J. Alex Baecher (jbaecher@gmail.com)
+### Correspondance: please contact the first author, J. Alex Baecher, for questions about the code or data: 
+  - e-mail: jbaecher@gmail.com
+  - github: https://github.com/slamander
+  - personal website: https://www.alexbaecher.com/
 __________________________________________________________________________________________________________________________________________
 
 ## Abstract:  
