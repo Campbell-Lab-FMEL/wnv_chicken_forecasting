@@ -14,6 +14,23 @@ pacman::p_load(
 
 conflicted::conflict_prefer_all("dplyr", quiet = T)
 
+
+#############################################################################################################################################
+################################################### Loading custom functions ################################################################ 
+#############################################################################################################################################
+
+source("functions/compare_models.R")
+source("functions/extract_model_data.R")
+source("functions/buildmermod_to_glmmtmb.R")
+source("functions/stepwise_vif.R")
+
+#############################################################################################################################################
+
+
+
+
+
+
 #############################################################################################################################################
 ###################################################### Processing chicken data ############################################################## 
 #############################################################################################################################################
@@ -79,112 +96,6 @@ data_seasonal_pred <- data_seasonal %>%
 
 
 
-
-#############################################################################################################################################
-################################################### Loading custom functions ################################################################ 
-#############################################################################################################################################
-
-source("functions/compare_models.R")
-source("functions/extract_model_data.R")
-source("functions/buildmermod_to_glmmtmb.R")
-source("functions/stepwise_vif.R")
-
-### Determine correct distributions for monthly and seasonal data
-
-## Monthly:
-
-# distr_monthly_models <- compare_models(
-#   formulas = "wnv ~ poly(prcp_lag1, 2) + developed + year + (1 | ID)",
-#   ziformulas = c("~0", "~0", "~0", "~1", "~1", "~1", "~.", "~.", "~."),
-#   families = c("poisson", "nbinom1", "nbinom2",
-#                "poisson", "nbinom1", "nbinom2",
-#                "truncated_poisson", "truncated_nbinom1", "truncated_nbinom2"),
-#   data = data_monthly_train)
-# 
-# distr_monthly_models$aictab
-# 
-# plot_model(distr_monthly_models$models[["zinbinom1"]], type = "pred", terms = "prcp_lag1 [-4:8, by=0.25]", se = T) +
-#   labs(x = "Cumulative Precip (seasonal lag)", y = "Predicted WNV conversion prevalence") +
-#   ggtitle("") +
-#   theme(plot.title = element_blank()) +
-#   theme_bw()
-# 
-# distr_seasonal_models <- compare_models(
-#   formulas = "wnv ~ poly(prcp_lag1, 2) + developed + year + (1 | ID)",
-#   ziformulas = c("~0", "~0", "~0", "~1", "~1", "~1", "~.", "~.", "~."),
-#   families = c("poisson", "nbinom1", "nbinom2",
-#                "poisson", "nbinom1", "nbinom2",
-#                "truncated_poisson", "truncated_nbinom1", "truncated_nbinom2"),
-#   data = data_seasonal_train)
-# 
-# distr_seasonal_models$aictab$Modnames_fix <- c("truncated_nbinom1", "truncated_nbinom2",
-#                                                       "zinf-nbinom1", "nbinom1",
-#                                                       "truncated_poisson", "zinf-nbinom2", "nbinom2",
-#                                                       "zinf-poisson", "poisson")
-# 
-# distr_seasonal_models$aictab$Modnames_fix
-# 
-# names(distr_seasonal_models$models) <- c("poisson", "nbinom1", "nbinom2",
-#                                                 "zinf-poisson", "zinf-nbinom1", "zinf-nbinom2",
-#                                                 "truncated_poisson", "truncated_nbinom1", "truncated_nbinom2")
-# 
-# ### Create basic model formulas
-# 
-# ## Multi-tier modeling system to determine variables of primary importance:
-# 
-# # Test of random effects: 
-# 
-# re_formulas <- c(
-#   "wnv ~ year"
-#   , "wnv ~ year + (1 | county)"
-#   , "wnv ~ year + (1 | ID)"
-#   , "wnv ~ year + (1 | county / ID)"
-#   # temporal structures didn't run properly... not sure why or what changed...
-#   , "wnv ~ time_step + (time_step | county)"
-#   , "wnv ~ time_step + (time_step | ID)"
-#   , "wnv ~ time_step + (1 | county) + (time_step | county)"
-#   , "wnv ~ time_step + (1 | ID ) + (time_step | ID)"
-#   , "wnv ~ time_step + ar1(as.factor(time_step) + 0 | county)"
-#   , "wnv ~ time_step + ar1(as.factor(time_step) + 0 | ID)"
-# )
-# 
-# ### Monthly
-# 
-# re_monthly_models <- compare_models(
-#   formulas = re_formulas,
-#   ziformulas = "~1",
-#   families = "nbinom1",
-#   data = data_monthly_train)
-# 
-# re_monthly_models$aictab
-# 
-# top_re_monthly <- re_monthly_models[[paste0(re_monthly_models$aictab$Modnames[1])]]
-# 
-# dharma_re_monthly <- top_re_monthly_active %>%
-#   simulateResiduals(); plot(dharma_re_monthly_active)
-# 
-# 
-# ### Seasonal
-# 
-# re_seasonal_models <- compare_models(
-#   formulas = re_formulas,
-#   ziformulas = "~1",
-#   families = "nbinom1",
-#   data = data_seasonal_train)
-# 
-# re_seasonal_models$aictab
-# 
-# top_re_seasonal <- re_seasonal_models[[paste0(re_seasonal_models$aictab$Modnames[1])]]
-# 
-# dharma_re_seasonal <- top_re_seasonal %>%
-#   simulateResiduals(); plot(dharma_re_seasonal)
-
-#############################################################################################################################################
-
-
-
-
-
 #############################################################################################################################################
 ############################################# Beginning Tier 1 of modeling workflow ######################################################### 
 #############################################################################################################################################
@@ -226,8 +137,6 @@ t1_formulas <- c(
   , "wnv ~ poly(natural, 2)"
   , "wnv ~ poly(wetlands, 2)") 
 
-#####
-
 #### Tier 1 models: 
 
 ### Monthly
@@ -238,7 +147,7 @@ t1_monthly_models <- compare_models(
   families = "nbinom1",
   data = data_monthly_train)
 
-# t1_monthly_models$aictab 
+t1_monthly_models$aictab 
 
 # summarizing t1 monthly models
 
@@ -251,17 +160,6 @@ t1_monthly_vars <- bind_rows(
   select(season, term, estimate, std.error, conf.low, conf.high, zero_span, sig) %>%
   as.data.frame()
 
-# ggplot(t1_monthly_vars) +
-#   aes(x = reorder(term, estimate), y = estimate, group = season) +
-#   geom_linerange(aes(ymin = estimate - std.error, ymax = estimate + std.error, col = season), 
-#                  position = position_dodge(width = 0.5), alpha = 0.5, linewidth = 1.5) +
-#   geom_pointrange(aes(ymin = conf.low, ymax = conf.high, col = season), 
-#                   position = position_dodge(width = 0.5), size = 0.5) +
-#   coord_flip() +
-#   geom_abline(slope = 0, linetype = "dashed", col = "grey40") +
-#   labs(x = "Term", y = expression(beta)) +
-#   theme_bw()
-
 #### Seasonal
 
 t1_seasonal_models <- compare_models(
@@ -269,6 +167,8 @@ t1_seasonal_models <- compare_models(
   ziformulas = "~0",
   families = "nbinom1",
   data = data_seasonal_train)
+
+t1_seasonal_models$aictab 
 
 ## summarize t1 seasonal models: 
 
@@ -280,18 +180,6 @@ t1_seasonal_vars <- bind_rows(
   filter(!term == "testing") %>%
   select(season, term, estimate, std.error, conf.low, conf.high, zero_span, sig) %>%
   as.data.frame()
-
-# ggplot(t1_seasonal_vars) +
-#   aes(x = reorder(term, estimate), y = estimate, group = season) +
-#   geom_linerange(aes(ymin = estimate - std.error, ymax = estimate + std.error, col = season), 
-#                  position = position_dodge(width = 0.5), alpha = 0.5, linewidth = 1.5) +
-#   geom_pointrange(aes(ymin = conf.low, ymax = conf.high, col = season), 
-#                   position = position_dodge(width = 0.5), size = 0.5) +
-#   coord_flip() +
-#   # annotate("text", x = 1:48, y = -55, label = reorder(t1_monthly_sig_vars$sig, t1_monthly_sig_vars$estimate)) +
-#   geom_abline(slope = 0, linetype = "dashed", col = "grey40") +
-#   labs(x = "Term", y = expression(beta)) +
-#   theme_bw()
 
 ##### Monthly:
 
@@ -320,13 +208,6 @@ t2_monthly_global_formula <- t2_monthly_sig_vars %>%
   paste(collapse = " + ") %>%
   as.data.frame(); t2_monthly_global_formula$.
 
-## create formula object for inactive season terms
-# t2_monthly_inglobal_formula <- t2_monthly_sig_vars %>%
-#   filter(season == "inactive") %>%
-#   select(term) %>%
-#   as_vector() %>%
-#   paste(collapse = " + ") %>%
-#   as.data.frame(); t2_monthly_inglobal_formula$.
 
 # seasonal
 
@@ -353,13 +234,6 @@ t2_seasonal_global_formula <- t2_seasonal_sig_vars %>%
   paste(collapse = " + ") %>%
   as.data.frame(); t2_seasonal_global_formula$.
 
-## create formula object for inactive season terms
-# t2_seasonal_inglobal_formula <- t2_seasonal_sig_vars %>%
-#   filter(season == "inactive") %>%
-#   select(term) %>%
-#   as_vector() %>%
-#   paste(collapse = " + ") %>%
-#   as.data.frame(); t2_seasonal_inglobal_formula$.
 
 ######
 
@@ -391,12 +265,18 @@ write_rds(seasonal_var_sel, "data/chickens/model_predictions/glmmTMB/seasonal_va
 
 t2_seasonal_fixed <- broom.mixed::tidy(t2_seasonal_glmmtmb$model)
 
-######
+#############################################################################################################################################
 
 
-########### Buildmer models for VIF calculation 
 
-###### Buildmer model: Seasonal - Active model 
+
+#############################################################################################################################################
+############################################# Beginning Tier 2 of modeling workflow ######################################################### 
+#############################################################################################################################################
+
+## Buildmer models for VIF calculation 
+
+## Buildmer model: Seasonal - Active model 
 t2_seasonal_buildmer_model <- buildglmmTMB(
   formula(paste0("wnv ~ ", t2_seasonal_global_formula$., " + year + offset(log(testing+1)) + (1 | county / ID)")),
   buildmerControl = list(direction = 'backward',
@@ -488,231 +368,4 @@ monthly_final_variables <- monthly_stepwise_vif$model %>%
   filter(!str_detect(term, fixed("2)2"))) %>%
   filter(!str_detect(term, fixed("year")))
 
-
-
-
-###############
-
-data_seasonal_pred <- seasonal_glmmtmb_model %>%
-  predict(data_seasonal_pred, se.fit = T, type = "response") %>%
-  as.data.frame() %>%
-  mutate(sample = ifelse(year %in% c("2018", "2019"), "predict", "train")) %>%
-  bind_cols(data_seasonal_pred)
-# data_seasonal_pred_rmse <- data_seasonal_pred %>%
-#   filter(sample == "predict") %>%
-#   mutate(rmse = sqrt(mean(wnv - preds))) %>%
-#   select(rmse)
-
-# monthly active
-data_monthly_pred <- monthly_glmmtmb_model %>%
-  predict(data_monthly_train, se.fit = T, type = "response") %>%
-  as.data.frame()
-# %>%
-#   mutate(sample = ifelse(year %in% c("2018", "2019"), "predict", "train")) %>%
-#   bind_cols(data_seasonal)
-# data_seasonal_pred_rmse <- data_seasonal_pred %>%
-#   filter(sample == "predict") %>%
-#   mutate(rmse = sqrt(mean(wnv - preds))) %>%
-#   select(rmse)
-
-rmse_comp <- data.frame(
-  model = c("seasonal_active", "seasonal_inactive", "monthly_active", "monthly_inactive"),
-  terms = c(seasonal_glmmtmb_formula, seasonal_inglmmtmb_formula, monthly_glmmtmb_formula, monthly_inglmmtmb_formula),
-  # rmse = c(data_seasonal_pred_rmse, data_seasonal_inpred_rmse, data_monthly_pred_rmse, data_monthly_inpred_rmse)
-  rmse = rep(NA, 4))
-
-########## 
-
-seasonal_plot_model <- ggpubr::ggarrange(
-  
-  plot_model(seasonal_glmmtmb_model, 
-             type = "pred", terms = "tmin_lag2 [-4:2, by=0.05]", se = T) + 
-    labs(x = parse(text = "Minimum~Temperature^2~~(1~year~lag)")) +
-    ylim(c(0, 2)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  grid::grid.rect(gp=grid::gpar(col="white")),
-  
-  plot_model(seasonal_glmmtmb_model, 
-             type = "pred", terms = "prcp [-2:4, by=0.05]", se = T) + 
-    labs(x = parse(text = "Cumulative~Precipitation^2~~(current)")) +
-    ylim(c(0, 2)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  plot_model(seasonal_glmmtmb_model, 
-             type = "pred", terms = "prcp_lag1 [-2:4, by=0.05]", se = T) + 
-    labs(x = "Cumulative precipitation  (6 month lag)") +
-    ylim(c(0, 2)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  plot_model(seasonal_glmmtmb_model, 
-             type = "pred", terms = "prcp_lag2 [-2:4, by=0.05]", se = T) + 
-    labs(x = parse(text = "Cumulative~Precipitation^2~~(1~year~lag)")) +
-    ylim(c(0, 2)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  plot_model(seasonal_glmmtmb_model, 
-             type = "pred", terms = "developed [-2:3, by=0.05]", se = T) + 
-    labs(x = parse(text = "Prop(Developed)^2")) +
-    ylim(c(0, 2)) +
-    ggtitle("")  +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  nrow = 3, 
-  ncol = 2); seasonal_plot_model
-
-seasonal_plot_model_ann <- ggpubr::annotate_figure(seasonal_plot_model, 
-                                                       left = grid::textGrob("Predicted WNV conversion prevalence", 
-                                                                             rot = 90, 
-                                                                             vjust = 0.8, 
-                                                                             gp = grid::gpar(cex = 1.2)),
-                                                       top = grid::textGrob("glmmTMB: Seasonal-Active", 
-                                                                            hjust = 0.5, 
-                                                                            vjust = 0.7,
-                                                                            gp = grid::gpar(cex = 1.5, fontface = "bold"))); seasonal_plot_model_ann
-ggsave("figures/Alex/wnv/glmmTMB/seasonal_plot_model_ann.jpeg", 
-       width = 8, height = 8, dpi = 600)
-
-##############
-
-seasonal_inplot_model <- ggpubr::ggarrange(
-  
-  plot_model(seasonal_inglmmtmb_model, 
-             type = "pred", terms = "tmin [all]", se = T) + 
-    labs(x = parse(text = "Munimum~Temperature^2~~(current)")) +
-    # ylim(c(0, 2)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  grid::grid.rect(gp=grid::gpar(col="white")),
-  
-  plot_model(seasonal_inglmmtmb_model, 
-             type = "pred", terms = "prcp [-2:4, by=0.05]", se = T) + 
-    labs(x = parse(text = "Cumulative~Precipitation^2~~(current)")) +
-    # ylim(c(0, 2)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  plot_model(seasonal_inglmmtmb_model, 
-             type = "pred", terms = "prcp_lag2 [-2:4, by=0.05]", se = T) + 
-    labs(x = parse(text = "Cumulative~Precipitation^2~~(1~year~lag)")) +
-    # ylim(c(0, 2)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-
-  
-  nrow = 2, 
-  ncol = 2); seasonal_inplot_model
-
-seasonal_plot_model_ann <- ggpubr::annotate_figure(seasonal_plot_model, 
-                                                          left = grid::textGrob("Predicted WNV conversion prevalence", 
-                                                                                rot = 90, 
-                                                                                vjust = 0.8, 
-                                                                                gp = grid::gpar(cex = 1.2)),
-                                                          top = grid::textGrob("glmmTMB: Seasonal-Active", 
-                                                                               hjust = 0.5, 
-                                                                               vjust = 0.7,
-                                                                               gp = grid::gpar(cex = 1.5, fontface = "bold"))); seasonal_plot_model_ann
-ggsave("figures/Alex/wnv/glmmTMB/seasonal_plot_model_ann.jpeg", 
-       width = 8, height = 8, dpi = 600)
-
-#############
-
-monthly_plot_model <- ggpubr::ggarrange(
-  
-  plot_model(monthly_glmmtmb_model, 
-             type = "pred", terms = "prcp_lag1 [-4:6, by=0.05]", se = T) + 
-    labs(x = parse(text = "Cumulative~Precipitation^2~~(6~month~lag)")) +
-    ylim(c(0, 0.25)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  plot_model(monthly_glmmtmb_model, 
-             type = "pred", terms = "tmin_lag1 [-3:4, by=0.05]", se = T) + 
-    labs(x = parse(text = "Minimum~Temperature^2~~(6~month~lag)")) +
-    ylim(c(0, 0.25)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  plot_model(monthly_glmmtmb_model, 
-             type = "pred", terms = "tmin_lag2 [-4:4, by=0.05]", se = T) + 
-    labs(x = parse(text = "Minimum~Temperature^2~~(1~year~lag)")) +
-    ylim(c(0, 0.25)) +
-    ggtitle("") +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-
-  plot_model(monthly_glmmtmb_model, 
-             type = "pred", terms = "developed [-2:4, by=0.05]", se = T) + 
-    labs(x = parse(text = "Prop(Developed)^2")) +
-    ylim(c(0, 0.25)) +
-    ggtitle("")  +
-    theme_bw() +
-    theme(plot.title = element_blank(),
-          axis.title.y = element_blank(),
-          axis.title.x = element_text(size = rel(1.2), vjust = 0.7)),
-  
-  nrow = 2, 
-  ncol = 2); monthly_plot_model
-
-monthly_plot_model_ann <- ggpubr::annotate_figure(monthly_plot_model, 
-                                                         left = grid::textGrob("Predicted WNV conversion prevalence", 
-                                                                               rot = 90, 
-                                                                               vjust = 0.8, 
-                                                                               gp = grid::gpar(cex = 1.2)),
-                                                         top = grid::textGrob("glmmTMB: Monthly-Active", 
-                                                                              hjust = 0.5, 
-                                                                              vjust = 0.7,
-                                                                              gp = grid::gpar(cex = 1.5, fontface = "bold"))); monthly_plot_model_ann
-ggsave("figures/Alex/wnv/glmmTMB/monthly_plot_model_ann.jpeg", 
-       width = 8, height = 8, dpi = 600)
-
-##############
-
-monthly_inplot_model <- plot_model(monthly_inglmmtmb_model, 
-                                           type = "pred", terms = "tmin [all]", se = T) + 
-  labs(x = "Minimum temperature (6 month lag)", y = "Predicted WNV conversion prevalence") +
-  # ylim(c(0, 1.5)) +
-  ggtitle("glmmTMB: Monthly-Inactive") +
-  theme_bw() +
-  theme(plot.title = element_text(face = "bold", vjust = 0.7, hjust = 0.5),
-        axis.title = element_text(vjust = 0.7)); monthly_inplot_model
-
-ggsave("figures/Alex/wnv/glmmTMB/monthly_inplot_model.jpeg", width = 4, height = 4, dpi = 600)
+#############################################################################################################################################
