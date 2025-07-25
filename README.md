@@ -29,7 +29,7 @@ West Nile Virus (WNV) is the leading cause of mosquito-borne disease in the Unit
   - [`/models`](./scripts/models): Contains scripts for executing temporal and spatiotemporal models
     - [`/glmmtmb`](./scripts/models/glmmtmb): Contains script for temporal modeling using [glmmTMB](https://github.com/glmmTMB/glmmTMB)
       - [`base_model_development.R`](./scripts/models/glmmtmb/base_model_development.R): Script for model selection and variable reduction
-    - [`/sdmtmb`](./scripts/models/sdmtmb): Contains scripts for spatiotemporaltemporal modeling with [sdmTMB](https://pbs-assess.github.io/sdmTMB/)
+    - [`/sdmtmb`](./scripts/models/sdmtmb): Contains scripts for spatiotemporal modeling with [sdmTMB](https://pbs-assess.github.io/sdmTMB/)
       - [`/fitting`](./scripts/models/sdmtmb/fitting): Contains scripts for model calibration and selection
         - [`model_calibration.R`](./scripts/models/sdmtmb/fitting/model_calibration.R): Fitting `sdmTMB` model
         - [`model_selection.R`](./scripts/models/sdmtmb/fitting/model_selection.R): Comparing model metrics for **SI Table 1** and **SI Table 2**
